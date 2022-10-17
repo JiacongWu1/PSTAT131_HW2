@@ -1,0 +1,117 @@
+---
+title: "PSTAT 131 HW2"
+author: "Jiacong Wu"
+date: "2022-10-17"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidymodels)
+library(tidyverse)
+f = "abalone.csv"
+```
+
+
+```{r}
+aba_data = read.csv(file = f)
+head(aba_data)
+```
+Question 1
+
+```{r}
+aba_data$age <-aba_data$rings + 1.5
+head(aba_data)
+```
+
+```{r}
+aba_data%>%
+  ggplot(aes(x = age)) + 
+  geom_histogram()
+```
+
+The distribution of age is left skewed, much of the mass of its distribution is at the lower end, majority of the abalones are aged less than 15.
+
+Question 2
+
+```{r}
+set.seed(1000)
+
+aba_split <- initial_split(aba_data, prop = 0.75,
+                                strata = age)
+aba_train <- training(aba_split)
+aba_test <- testing(aba_split)
+```
+
+Question 3
+
+Rings should not be included because the age is diredctly calculated from rings. There is a super strong correlation between the two variables. If rings is included in the predictors, the model will be overfit. 
+
+```{r}
+aba_recipe <-
+  recipe(age ~ type + longest_shell + diameter + height + whole_weight + shucked_weight + viscera_weight + shell_weight, data = aba_train)%>%
+  step_dummy(all_nominal_predictors())%>%
+  step_interact(terms = ~ starts_with('type'):shucked_weight)%>%
+  step_interact(terms = ~ longest_shell:diameter)%>%
+  step_interact(terms = ~ shucked_weight:shell_weight)%>%
+  step_center(all_predictors())%>%
+  step_scale(all_predictors())
+aba_recipe
+```
+
+Question 4
+
+```{r}
+lm_model <- linear_reg() %>% 
+  set_engine("lm")
+```
+
+Question 5
+
+```{r}
+aba_lm_wflow <- workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(aba_recipe)
+```
+
+Question 6
+
+```{r}
+lm_fit <- fit(aba_lm_wflow, aba_train)
+lm_fit
+```
+
+```{r}
+predict(lm_fit, data.frame(type = "F",longest_shell = 0.50,diameter = 0.10, height = 0.30, whole_weight = 4, shucked_weight = 1, viscera_weight = 2, shell_weight = 1))
+```
+Question 7
+
+```{r}
+library(yardstick)
+aba_metric = metric_set(rsq,rmse,mae)
+aba_train_result = predict(lm_fit,aba_train %>% select(-age,-rings))
+aba_train_result =bind_cols(aba_train_result,aba_train %>% select(age))
+head(aba_train_result)
+```
+
+```{r}
+aba_metrics = aba_metric(aba_train_result,truth =age, estimate = .pred)
+aba_metrics
+```
+
+
+
+
+
+
+
+
+
+
+
